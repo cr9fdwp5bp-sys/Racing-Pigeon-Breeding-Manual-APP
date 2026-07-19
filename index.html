@@ -1,565 +1,309 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>鴿舍日誌 Lite - 原型</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, sans-serif; background: #000; overflow: hidden; user-select: none; height: 100vh; width: 100vw; }
-    #app { width: 100%; height: 100%; position: relative; display: flex; flex-direction: column; }
-    /* 相機全屏視圖 */
-    #cameraView { flex: 1; background: #111; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-    video { width: 100%; height: 100%; object-fit: cover; }
-    #shutterBtn { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 70px; height: 70px; background: rgba(255,255,255,0.3); border: 4px solid white; border-radius: 50%; cursor: pointer; z-index: 20; }
-    #shutterBtn:active { background: rgba(255,255,255,0.7); }
-    .bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 100px; display: flex; justify-content: space-around; align-items: center; pointer-events: none; }
-    .nav-btn { pointer-events: auto; background: rgba(0,0,0,0.5); color: white; padding: 10px 16px; border-radius: 20px; font-size: 14px; backdrop-filter: blur(4px); border: none; }
-    .rec-indicator { position: absolute; top: 20px; right: 20px; width: 12px; height: 12px; border-radius: 50%; background: red; opacity: 0; transition: opacity 0.2s; z-index: 30; }
-    .rec-indicator.active { opacity: 1; animation: pulse 0.5s infinite; }
-    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
-    .green-check { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 60px; color: lime; opacity: 0; z-index: 40; transition: opacity 0.3s; }
-    .green-check.show { opacity: 1; }
-
-    /* 時間軸瀏覽 */
-    #timelineView { display: none; position: absolute; inset: 0; background: #f5f5f5; z-index: 50; overflow-y: auto; padding: 10px; flex-direction: column; }
-    .timeline-header { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-radius: 12px; margin-bottom: 10px; }
-    .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-    .photo-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; background: #ddd; cursor: pointer; }
-    .date-group { margin-bottom: 16px; }
-    .date-label { font-weight: bold; margin-bottom: 4px; color: #333; }
-
-    /* 細節編輯彈窗 */
-    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; justify-content: center; align-items: center; }
-    .modal-content { background: white; width: 90%; max-width: 400px; border-radius: 16px; padding: 20px; }
-    .modal img { width: 100%; border-radius: 8px; margin-bottom: 10px; }
-    select, input, textarea { width: 100%; padding: 10px; margin: 6px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; }
-    .btn-group { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
-    button { background: #007aff; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; }
-    button.secondary { background: #ddd; color: #333; }
-
-    /* 設定 */
-    #settingsView { display: none; position: absolute; inset: 0; background: #f5f5f5; z-index: 50; padding: 20px; }
-    .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
-    .back-btn { font-size: 18px; background: none; color: #007aff; padding: 5px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>超級種鴿管理系統 (Web App)</title>
+    <style>
+        :root {
+            --primary: #065a60;
+            --secondary: #0b525b;
+            --bg-color: #f4f7f6;
+            --danger: #dc3545;
+            --success: #28a745;
+            --warning: #ffc107;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        .header {
+            background-color: var(--primary);
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+        }
+        .nav {
+            display: flex;
+            background-color: var(--secondary);
+            overflow-x: auto;
+        }
+        .nav button {
+            background: none;
+            border: none;
+            color: white;
+            padding: 15px 20px;
+            cursor: pointer;
+            font-size: 16px;
+            flex: 1;
+        }
+        .nav button:hover, .nav button.active {
+            background-color: rgba(255,255,255,0.2);
+        }
+        .container {
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .tab-content {
+            display: none;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="number"], input[type="date"], select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button.submit-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+        }
+        button.submit-btn:hover {
+            background-color: var(--secondary);
+        }
+        .alert-box {
+            padding: 15px;
+            margin-top: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .alert-danger { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th { background-color: var(--primary); color: white; }
+    </style>
 </head>
 <body>
-<div id="app">
-  <!-- 相機視圖 (預設顯示) -->
-  <div id="cameraView">
-    <video id="video" autoplay playsinline muted></video>
-    <div class="rec-indicator" id="recIndicator"></div>
-    <div class="green-check" id="greenCheck">✓</div>
-    <div id="shutterBtn"></div>
-    <div class="bottom-bar">
-      <button class="nav-btn" id="toTimelineBtn">時間軸</button>
-      <button class="nav-btn" id="toSettingsBtn">設定</button>
-    </div>
-  </div>
 
-  <!-- 時間軸視圖 -->
-  <div id="timelineView">
-    <div class="timeline-header">
-      <h3>📋 記錄時間軸</h3>
-      <button class="back-btn" id="backToCameraBtn">← 返回相機</button>
+    <div class="header">
+        <h2>🏆 達人種鴿管理系統</h2>
     </div>
-    <div id="timelineContent"></div>
-    <div style="margin: 16px 0; text-align: center;">
-      <button id="exportBtn">匯出本月資料 (ZIP)</button>
-    </div>
-  </div>
 
-  <!-- 設定視圖 -->
-  <div id="settingsView">
-    <div class="timeline-header">
-      <h3>⚙️ 設定</h3>
-      <button class="back-btn" id="backFromSettingsBtn">← 返回相機</button>
+    <div class="nav">
+        <button class="active" onclick="openTab('env-tab')">環境監控</button>
+        <button onclick="openTab('poop-tab')">糞便紀錄</button>
+        <button onclick="openTab('health-tab')">健康紀錄</button>
     </div>
-    <div class="setting-row">
-      <span>語音標記 (3秒)</span>
-      <input type="checkbox" id="voiceToggle" checked>
-    </div>
-    <div class="setting-row">
-      <span>預設鴿舍區域</span>
-      <select id="loftZoneSelect">
-        <option value="未分類">未分類</option>
-        <option value="種鴿舍左側">種鴿舍左側</option>
-        <option value="種鴿舍右側">種鴿舍右側</option>
-        <option value="比賽舍">比賽舍</option>
-        <option value="隔離區">隔離區</option>
-      </select>
-    </div>
-    <div style="margin-top: 20px;">
-      <button id="clearAllBtn" style="background:#ff3b30;">清除所有資料 (不可逆)</button>
-    </div>
-  </div>
 
-  <!-- 編輯彈窗 -->
-  <div class="modal" id="editModal">
-    <div class="modal-content">
-      <img id="modalImage" src="" alt="照片預覽">
-      <label>健康狀態</label>
-      <select id="modalHealth">
-        <option value="">未選擇</option>
-        <option value="正常成團">正常成團</option>
-        <option value="條狀偏軟">條狀偏軟</option>
-        <option value="水便">水便</option>
-        <option value="綠便">綠便</option>
-        <option value="帶血">帶血</option>
-        <option value="其他">其他</option>
-      </select>
-      <label>腳環號</label>
-      <input type="text" id="modalBand" placeholder="#T2024-00123" list="bandList">
-      <datalist id="bandList"></datalist>
-      <label>備註</label>
-      <textarea id="modalNotes" rows="2" placeholder="任何備註..."></textarea>
-      <div class="btn-group">
-        <button class="secondary" id="cancelEditBtn">取消</button>
-        <button id="saveEditBtn">儲存</button>
-      </div>
-      <button id="playAudioBtn" style="margin-top: 8px; background:#34c759;" disabled>▶ 播放語音</button>
+    <div class="container">
+        <!-- 模組 1: 環境監控 -->
+        <div id="env-tab" class="tab-content active">
+            <h3>環境數據紅色警戒測試</h3>
+            <div class="form-group">
+                <label>舍內氨氣濃度 (ppm):</label>
+                <input type="number" id="ammonia" placeholder="安全值 < 15">
+            </div>
+            <div class="form-group">
+                <label>底層相對濕度 (%):</label>
+                <input type="number" id="humidity" placeholder="安全值 < 70">
+            </div>
+            <div class="form-group">
+                <label>晝夜溫差 (°C):</label>
+                <input type="number" id="tempDiff" placeholder="安全值 < 10">
+            </div>
+            <div class="form-group">
+                <label>飲水 TDS 值 (ppm):</label>
+                <input type="number" id="tds" placeholder="安全值 < 200">
+            </div>
+            <button class="submit-btn" onclick="checkEnvironment()">檢測風險</button>
+            
+            <div id="env-alert" class="alert-box"></div>
+        </div>
+
+        <!-- 模組 2: 糞便紀錄 -->
+        <div id="poop-tab" class="tab-content">
+            <h3>每日糞便基準線紀錄</h3>
+            <div class="form-group">
+                <label>日期:</label>
+                <input type="date" id="poop-date">
+            </div>
+            <div class="form-group">
+                <label>腳環號 (或配對籠號):</label>
+                <input type="text" id="poop-id" placeholder="例如: T-2023-123456">
+            </div>
+            <div class="form-group">
+                <label>狀態評估:</label>
+                <select id="poop-status">
+                    <option value="正常成團">正常成團</option>
+                    <option value="條狀偏軟">條狀偏軟</option>
+                    <option value="水便">水便</option>
+                    <option value="綠便">綠便</option>
+                    <option value="帶血">帶血</option>
+                </select>
+            </div>
+            <button class="submit-btn" onclick="savePoopData()">儲存紀錄</button>
+
+            <h4>歷史紀錄 (本地端快取)</h4>
+            <table id="poop-table">
+                <thead><tr><th>日期</th><th>腳環號</th><th>狀態</th><th>操作</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- 模組 3: 健康紀錄 -->
+        <div id="health-tab" class="tab-content">
+            <h3>個體健康紀錄卡</h3>
+            <div class="form-group">
+                <label>日期:</label>
+                <input type="date" id="health-date">
+            </div>
+            <div class="form-group">
+                <label>腳環號:</label>
+                <input type="text" id="health-id" placeholder="例如: T-2023-123456">
+            </div>
+            <div class="form-group">
+                <label>常態體重 (g):</label>
+                <input type="number" id="health-weight">
+            </div>
+            <div class="form-group">
+                <label>異常事件 / 用藥備註:</label>
+                <textarea id="health-notes" rows="3" placeholder="例如: 投餵水飛薊素第1天"></textarea>
+            </div>
+            <button class="submit-btn" onclick="saveHealthData()">儲存紀錄</button>
+
+            <h4>歷史紀錄 (本地端快取)</h4>
+            <table id="health-table">
+                <thead><tr><th>日期</th><th>腳環號</th><th>體重(g)</th><th>備註</th><th>操作</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
-  </div>
-</div>
 
-<!-- 使用 JSZip 用於匯出 ZIP (CDN, 但可離線時載入備用) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script>
-  // ---------- 全域變數與初始化 ----------
-  const DB_NAME = 'PigeonLogDB';
-  const DB_VERSION = 1;
-  let db;
-  let currentStream;
-  let currentPhotoId = null; // 編輯中的照片ID
-  let mediaRecorder;
-  let audioChunks = [];
-  const defaultLoftZone = () => localStorage.getItem('defaultLoftZone') || '未分類';
-  const voiceEnabled = () => localStorage.getItem('voiceEnabled') !== 'false'; // 預設開啟
+    <script>
+        // 初始化日期為今日
+        document.getElementById('poop-date').valueAsDate = new Date();
+        document.getElementById('health-date').valueAsDate = new Date();
 
-  // ---------- IndexedDB 操作 ----------
-  function openDB() {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-      request.onupgradeneeded = (event) => {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains('photos')) {
-          const store = db.createObjectStore('photos', { keyPath: 'photo_id' });
-          store.createIndex('captured_at', 'captured_at', { unique: false });
-          store.createIndex('band_number', 'band_number', { unique: false });
+        // 頁籤切換邏輯
+        function openTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
         }
-      };
-      request.onsuccess = (event) => { db = event.target.result; resolve(db); };
-      request.onerror = (event) => reject(event.target.error);
-    });
-  }
 
-  function addPhoto(photo) {
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('photos', 'readwrite');
-      const store = tx.objectStore('photos');
-      store.add(photo);
-      tx.oncomplete = () => resolve();
-      tx.onerror = (e) => reject(e.target.error);
-    });
-  }
+        // 環境數據檢測邏輯
+        function checkEnvironment() {
+            const ammonia = parseFloat(document.getElementById('ammonia').value) || 0;
+            const humidity = parseFloat(document.getElementById('humidity').value) || 0;
+            const tempDiff = parseFloat(document.getElementById('tempDiff').value) || 0;
+            const tds = parseFloat(document.getElementById('tds').value) || 0;
+            
+            let alerts = [];
+            
+            if (ammonia > 15) alerts.push("【紅色警戒】氨氣 > 15ppm：呼吸道黏膜受損，請強制排氣！");
+            if (humidity > 80) alerts.push("【紅色警戒】濕度 > 80%：黴菌活化風險高，需除濕！");
+            if (tempDiff > 10) alerts.push("【紅色警戒】溫差 > 10°C：觸發慢性應激，加強夜間保溫！");
+            if (tds > 300) alerts.push("【紅色警戒】TDS > 300ppm：腸道菌相失衡，請改用純水！");
 
-  function updatePhoto(photo_id, changes) {
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('photos', 'readwrite');
-      const store = tx.objectStore('photos');
-      const getReq = store.get(photo_id);
-      getReq.onsuccess = () => {
-        const data = getReq.result;
-        if (!data) return reject('not found');
-        Object.assign(data, changes);
-        store.put(data);
-        tx.oncomplete = () => resolve();
-        tx.onerror = (e) => reject(e.target.error);
-      };
-      getReq.onerror = (e) => reject(e.target.error);
-    });
-  }
+            const alertBox = document.getElementById('env-alert');
+            alertBox.style.display = 'block';
 
-  function getAllPhotos() {
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('photos', 'readonly');
-      const store = tx.objectStore('photos');
-      const index = store.index('captured_at');
-      const request = index.openCursor(null, 'prev'); // 新到舊
-      const results = [];
-      request.onsuccess = (event) => {
-        const cursor = event.target.result;
-        if (cursor) {
-          results.push(cursor.value);
-          cursor.continue();
-        } else {
-          resolve(results);
+            if (alerts.length > 0) {
+                alertBox.className = 'alert-box alert-danger';
+                alertBox.innerHTML = "<strong>發現風險：</strong><br>" + alerts.join("<br>");
+            } else {
+                alertBox.className = 'alert-box alert-success';
+                alertBox.innerHTML = "<strong>環境數據正常</strong>：目前未觸發紅色警戒。";
+            }
         }
-      };
-      request.onerror = (e) => reject(e.target.error);
-    });
-  }
 
-  function getPhotoById(photo_id) {
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('photos', 'readonly');
-      const store = tx.objectStore('photos');
-      const req = store.get(photo_id);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = (e) => reject(e.target.error);
-    });
-  }
-
-  function deleteAllPhotos() {
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('photos', 'readwrite');
-      const store = tx.objectStore('photos');
-      store.clear();
-      tx.oncomplete = () => resolve();
-      tx.onerror = (e) => reject(e.target.error);
-    });
-  }
-
-  // ---------- 工具函數 ----------
-  function generateUUID() {
-    return 'xxxx-xxxx-4xxx-yxxx-xxxx'.replace(/[xy]/g, c => {
-      const r = Math.random() * 16 | 0;
-      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-    });
-  }
-
-  function formatDateTime(iso) {
-    const d = new Date(iso);
-    const pad = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }
-
-  function showGreenCheck() {
-    const el = document.getElementById('greenCheck');
-    el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 800);
-  }
-
-  // ---------- 相機與拍照 ----------
-  async function startCamera() {
-    try {
-      if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-      currentStream = stream;
-      document.getElementById('video').srcObject = stream;
-    } catch (err) {
-      alert('無法啟動相機，請確認已授予權限。');
-    }
-  }
-
-  function stopCamera() {
-    if (currentStream) {
-      currentStream.getTracks().forEach(track => track.stop());
-      currentStream = null;
-    }
-  }
-
-  function capturePhoto() {
-    const video = document.getElementById('video');
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/jpeg', 0.9); // base64
-  }
-
-  async function startVoiceRecording(photoId) {
-    if (!voiceEnabled()) return;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream);
-      audioChunks = [];
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunks.push(e.data);
-      };
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const base64Audio = reader.result; // data:audio/webm;base64,...
-          await updatePhoto(photoId, { audio_data: base64Audio });
-        };
-        reader.readAsDataURL(audioBlob);
-        // 釋放麥克風
-        stream.getTracks().forEach(t => t.stop());
-      };
-      mediaRecorder.start();
-      document.getElementById('recIndicator').classList.add('active');
-      setTimeout(() => {
-        if (mediaRecorder && mediaRecorder.state === 'recording') {
-          mediaRecorder.stop();
-          document.getElementById('recIndicator').classList.remove('active');
+        // 通用儲存與渲染邏輯 (基於瀏覽器 LocalStorage)
+        function saveData(storageKey, dataObj) {
+            let data = JSON.parse(localStorage.getItem(storageKey)) || [];
+            data.push(dataObj);
+            localStorage.setItem(storageKey, JSON.stringify(data));
         }
-      }, 3000);
-    } catch (e) {
-      console.warn('無法錄音', e);
-    }
-  }
 
-  // 拍照主流程
-  async function onShutter() {
-    const photoData = capturePhoto();
-    const photoId = generateUUID();
-    const now = new Date().toISOString();
-    const zone = defaultLoftZone();
+        function loadData(storageKey, tableId, columns) {
+            let data = JSON.parse(localStorage.getItem(storageKey)) || [];
+            let tbody = document.querySelector(`#${tableId} tbody`);
+            tbody.innerHTML = '';
+            data.forEach((row, index) => {
+                let tr = document.createElement('tr');
+                columns.forEach(col => {
+                    let td = document.createElement('td');
+                    td.textContent = row[col];
+                    tr.appendChild(td);
+                });
+                let actionTd = document.createElement('td');
+                actionTd.innerHTML = `<button onclick="deleteData('${storageKey}', ${index}, '${tableId}', ${JSON.stringify(columns)})">刪除</button>`;
+                tr.appendChild(actionTd);
+                tbody.appendChild(tr);
+            });
+        }
 
-    const record = {
-      photo_id: photoId,
-      image_data: photoData,      // base64 jpeg
-      captured_at: now,
-      loft_zone: zone,
-      band_number: null,
-      health_status: null,
-      notes: null,
-      audio_data: null
-    };
+        function deleteData(storageKey, index, tableId, columns) {
+            let data = JSON.parse(localStorage.getItem(storageKey));
+            data.splice(index, 1);
+            localStorage.setItem(storageKey, JSON.stringify(data));
+            loadData(storageKey, tableId, columns);
+        }
 
-    await addPhoto(record);
-    showGreenCheck();
+        // 糞便數據操作
+        function savePoopData() {
+            const date = document.getElementById('poop-date').value;
+            const id = document.getElementById('poop-id').value;
+            const status = document.getElementById('poop-status').value;
+            if(!id) return alert("請輸入腳環號");
+            saveData('pigeon_poop', { date, id, status });
+            loadData('pigeon_poop', 'poop-table', ['date', 'id', 'status']);
+            document.getElementById('poop-id').value = ''; 
+        }
 
-    // 啟動3秒錄音 (非同步)
-    startVoiceRecording(photoId);
-  }
+        // 健康數據操作
+        function saveHealthData() {
+            const date = document.getElementById('health-date').value;
+            const id = document.getElementById('health-id').value;
+            const weight = document.getElementById('health-weight').value;
+            const notes = document.getElementById('health-notes').value;
+            if(!id) return alert("請輸入腳環號");
+            saveData('pigeon_health', { date, id, weight, notes });
+            loadData('pigeon_health', 'health-table', ['date', 'id', 'weight', 'notes']);
+            document.getElementById('health-id').value = '';
+            document.getElementById('health-weight').value = '';
+            document.getElementById('health-notes').value = '';
+        }
 
-  // ---------- 時間軸與UI ----------
-  async function loadTimeline() {
-    const photos = await getAllPhotos();
-    const container = document.getElementById('timelineContent');
-    container.innerHTML = '';
-
-    // 按日期分組
-    const groups = {};
-    photos.forEach(p => {
-      const date = p.captured_at.split('T')[0];
-      if (!groups[date]) groups[date] = [];
-      groups[date].push(p);
-    });
-
-    for (const [date, items] of Object.entries(groups)) {
-      const groupDiv = document.createElement('div');
-      groupDiv.className = 'date-group';
-      groupDiv.innerHTML = `<div class="date-label">${date}</div><div class="photo-grid"></div>`;
-      const grid = groupDiv.querySelector('.photo-grid');
-      items.forEach(p => {
-        const img = document.createElement('img');
-        img.src = p.image_data;
-        img.className = 'photo-thumb';
-        img.onclick = () => openEditModal(p.photo_id);
-        grid.appendChild(img);
-      });
-      container.appendChild(groupDiv);
-    }
-
-    if (photos.length === 0) {
-      container.innerHTML = '<p style="text-align:center; color:#888;">尚無記錄，請拍張照片開始。</p>';
-    }
-  }
-
-  async function openEditModal(photoId) {
-    const photo = await getPhotoById(photoId);
-    if (!photo) return;
-    currentPhotoId = photoId;
-    document.getElementById('modalImage').src = photo.image_data;
-    document.getElementById('modalHealth').value = photo.health_status || '';
-    document.getElementById('modalBand').value = photo.band_number || '';
-    document.getElementById('modalNotes').value = photo.notes || '';
-
-    const playBtn = document.getElementById('playAudioBtn');
-    if (photo.audio_data) {
-      playBtn.disabled = false;
-      playBtn.onclick = () => {
-        const audio = new Audio(photo.audio_data);
-        audio.play();
-      };
-    } else {
-      playBtn.disabled = true;
-    }
-
-    // 更新腳環號建議
-    updateBandSuggestions();
-
-    document.getElementById('editModal').style.display = 'flex';
-  }
-
-  function closeEditModal() {
-    document.getElementById('editModal').style.display = 'none';
-    currentPhotoId = null;
-  }
-
-  async function saveEdit() {
-    if (!currentPhotoId) return;
-    const changes = {
-      health_status: document.getElementById('modalHealth').value || null,
-      band_number: document.getElementById('modalBand').value || null,
-      notes: document.getElementById('modalNotes').value || null
-    };
-    await updatePhoto(currentPhotoId, changes);
-    closeEditModal();
-    loadTimeline(); // 刷新時間軸
-  }
-
-  async function updateBandSuggestions() {
-    const photos = await getAllPhotos();
-    const bands = new Set();
-    photos.forEach(p => { if (p.band_number) bands.add(p.band_number); });
-    const datalist = document.getElementById('bandList');
-    datalist.innerHTML = '';
-    bands.forEach(b => {
-      const opt = document.createElement('option');
-      opt.value = b;
-      datalist.appendChild(opt);
-    });
-  }
-
-  // 匯出本月資料 (簡化: 全部匯出為ZIP含CSV)
-  async function exportData() {
-    const photos = await getAllPhotos();
-    if (photos.length === 0) {
-      alert('沒有資料可匯出');
-      return;
-    }
-
-    // 使用JSZip (如果載入失敗則降級為純CSV)
-    if (typeof JSZip === 'undefined') {
-      alert('JSZip 未載入，將僅下載 CSV 檔案。');
-      downloadCSV(photos);
-      return;
-    }
-
-    const zip = new JSZip();
-    const csvRows = [['photo_id', 'captured_at', 'loft_zone', 'band_number', 'health_status', 'notes', 'image_file', 'audio_file']];
-    
-    for (const p of photos) {
-      const imgFileName = `${p.photo_id}.jpg`;
-      const audioFileName = p.audio_data ? `${p.photo_id}.webm` : '';
-      
-      // 加入照片檔案 (base64 -> blob)
-      if (p.image_data) {
-        const imgBlob = dataURItoBlob(p.image_data);
-        zip.file(imgFileName, imgBlob);
-      }
-      if (p.audio_data) {
-        const audioBlob = dataURItoBlob(p.audio_data);
-        zip.file(audioFileName, audioBlob);
-      }
-      
-      csvRows.push([
-        p.photo_id,
-        p.captured_at,
-        p.loft_zone,
-        p.band_number || '',
-        p.health_status || '',
-        p.notes || '',
-        imgFileName,
-        audioFileName
-      ]);
-    }
-
-    const csvContent = csvRows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-    zip.file('export.csv', csvContent);
-
-    const content = await zip.generateAsync({ type: 'blob' });
-    const url = URL.createObjectURL(content);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `pigeon_log_${new Date().toISOString().slice(0,10)}.zip`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function dataURItoBlob(dataURI) {
-    const byteString = atob(dataURI.split(',')[1]);
-    const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
-    const ab = new ArrayBuffer(byteString.length);
-    const ia = new Uint8Array(ab);
-    for (let i = 0; i < byteString.length; i++) {
-      ia[i] = byteString.charCodeAt(i);
-    }
-    return new Blob([ab], { type: mimeString });
-  }
-
-  function downloadCSV(photos) {
-    const rows = [['photo_id', 'captured_at', 'loft_zone', 'band_number', 'health_status', 'notes']];
-    photos.forEach(p => rows.push([p.photo_id, p.captured_at, p.loft_zone, p.band_number||'', p.health_status||'', p.notes||'']));
-    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `pigeon_log_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-  }
-
-  // ---------- 視圖切換 ----------
-  function showView(viewId) {
-    document.getElementById('cameraView').style.display = 'none';
-    document.getElementById('timelineView').style.display = 'none';
-    document.getElementById('settingsView').style.display = 'none';
-    document.getElementById(viewId).style.display = viewId === 'timelineView' ? 'flex' : 'block';
-    if (viewId === 'timelineView') {
-      loadTimeline();
-    }
-  }
-
-  // ---------- 事件綁定 ----------
-  document.getElementById('shutterBtn').addEventListener('click', onShutter);
-  document.getElementById('toTimelineBtn').addEventListener('click', () => {
-    stopCamera();
-    showView('timelineView');
-  });
-  document.getElementById('backToCameraBtn').addEventListener('click', () => {
-    showView('cameraView');
-    startCamera();
-  });
-  document.getElementById('toSettingsBtn').addEventListener('click', () => {
-    stopCamera();
-    showView('settingsView');
-  });
-  document.getElementById('backFromSettingsBtn').addEventListener('click', () => {
-    showView('cameraView');
-    startCamera();
-  });
-  document.getElementById('cancelEditBtn').addEventListener('click', closeEditModal);
-  document.getElementById('saveEditBtn').addEventListener('click', saveEdit);
-  document.getElementById('exportBtn').addEventListener('click', exportData);
-
-  document.getElementById('voiceToggle').addEventListener('change', (e) => {
-    localStorage.setItem('voiceEnabled', e.target.checked);
-  });
-  document.getElementById('loftZoneSelect').addEventListener('change', (e) => {
-    localStorage.setItem('defaultLoftZone', e.target.value);
-  });
-  document.getElementById('clearAllBtn').addEventListener('click', async () => {
-    if (confirm('確定要清除所有照片與記錄嗎？此操作無法復原！')) {
-      await deleteAllPhotos();
-      alert('已清除所有資料');
-      loadTimeline();
-    }
-  });
-
-  // 初始化設定值
-  document.getElementById('voiceToggle').checked = voiceEnabled();
-  document.getElementById('loftZoneSelect').value = defaultLoftZone();
-
-  // 啟動應用
-  (async () => {
-    await openDB();
-    await startCamera();
-    // 預設顯示相機
-    showView('cameraView');
-  })();
-
-  // 頁面關閉時釋放鏡頭
-  window.addEventListener('beforeunload', () => stopCamera());
-</script>
+        // 初始化載入
+        window.onload = function() {
+            loadData('pigeon_poop', 'poop-table', ['date', 'id', 'status']);
+            loadData('pigeon_health', 'health-table', ['date', 'id', 'weight', 'notes']);
+        }
+    </script>
 </body>
 </html>
