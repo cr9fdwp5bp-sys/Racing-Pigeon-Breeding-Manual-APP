@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>鴿舍日誌 Lite - 原型</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, sans-serif; background: #000; overflow: hidden; user-select: none; height: 100vh; width: 100vw; }
+    #app { width: 100%; height: 100%; position: relative; display: flex; flex-direction: column; }
+    /* 相機全屏視圖 */
+    #cameraView { flex: 1; background: #111; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    video { width: 100%; height: 100%; object-fit: cover; }
+    #shutterBtn { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 70px; height: 70px; background: rgba(255,255,255,0.3); border: 4px solid white; border-radius: 50%; cursor: pointer; z-index: 20; }
+    #shutterBtn:active { background: rgba(255,255,255,0.7); }
+    .bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 100px; display: flex; justify-content: space-around; align-items: center; pointer-events: none; }
+    .nav-btn { pointer-events: auto; background: rgba(0,0,0,0.5); color: white; padding: 10px 16px; border-radius: 20px; font-size: 14px; backdrop-filter: blur(4px); border: none; }
+    .rec-indicator { position: absolute; top: 20px; right: 20px; width: 12px; height: 12px; border-radius: 50%; background: red; opacity: 0; transition: opacity 0.2s; z-index: 30; }
+    .rec-indicator.active { opacity: 1; animation: pulse 0.5s infinite; }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
+    .green-check { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 60px; color: lime; opacity: 0; z-index: 40; transition: opacity 0.3s; }
+    .green-check.show { opacity: 1; }
+
+    /* 時間軸瀏覽 */
+    #timelineView { display: none; position: absolute; inset: 0; background: #f5f5f5; z-index: 50; overflow-y: auto; padding: 10px; flex-direction: column; }
+    .timeline-header { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-radius: 12px; margin-bottom: 10px; }
+    .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+    .photo-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; background: #ddd; cursor: pointer; }
+    .date-group { margin-bottom: 16px; }
+    .date-label { font-weight: bold; margin-bottom: 4px; color: #333; }
+
+    /* 細節編輯彈窗 */
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; justify-content: center; align-items: center; }
+    .modal-content { background: white; width: 90%; max-width: 400px; border-radius: 16px; padding: 20px; }
+    .modal img { width: 100%; border-radius: 8px; margin-bottom: 10px; }
+    select, input, textarea { width: 100%; padding: 10px; margin: 6px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; }
+    .btn-group { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
+    button { background: #007aff; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; }
+    button.secondary { background: #ddd; color: #333; }
+
+    /* 設定 */
+    #settingsView { display: none; position: absolute; inset: 0; background: #f5f5f5; z-index: 50; padding: 20px; }
+    .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
+    .back-btn { font-size: 18px; background: none; color: #007aff; padding: 5px; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- 相機視圖 (預設顯示) -->
+  <div id="cameraView">
+    <video id="video" autoplay playsinline muted></video>
+    <div class="rec-indicator" id="recIndicator"></div>
+    <div class="green-check" id="greenCheck">✓</div>
+    <div id="shutterBtn"></div>
+    <div class="bottom-bar">
+      <button class="nav-btn" id="toTimelineBtn">時間軸</button>
+      <button class="nav-btn" id="toSettingsBtn">設定</button>
+    </div>
+  </div>
+
+  <!-- 時間軸視圖 -->
+  <div id="timelineView">
+    <div class="timeline-header">
+      <h3>📋 記錄時間軸</h3>
+      <button class="back-btn" id="backToCameraBtn">← 返回相機</button>
+    </div>
+    <div id="timelineContent"></div>
+    <div style="margin: 16px 0; text-align: center;">
+      <button id="exportBtn">匯出本月資料 (ZIP)</button>
+    </div>
+  </div>
+
+  <!-- 設定視圖 -->
+  <div id="settingsView">
+    <div class="timeline-header">
+      <h3>⚙️ 設定</h3>
+      <button class="back-btn" id="backFromSettingsBtn">← 返回相機</button>
+    </div>
+    <div class="setting-row">
+      <span>語音標記 (3秒)</span>
+      <input type="checkbox" id="voiceToggle" checked>
+    </div>
+    <div class="setting-row">
+      <span>預設鴿舍區域</span>
+      <select id="loftZoneSelect">
+        <option value="未分類">未分類</option>
+        <option value="種鴿舍左側">種鴿舍左側</option>
+        <option value="種鴿舍右側">種鴿舍右側</option>
+        <option value="比賽舍">比賽舍</option>
+        <option value="隔離區">隔離區</option>
+      </select>
+    </div>
+    <div style="margin-top: 20px;">
+      <button id="clearAllBtn" style="background:#ff3b30;">清除所有資料 (不可逆)</button>
+    </div>
+  </div>
+
+  <!-- 編輯彈窗 -->
+  <div class="modal" id="editModal">
+    <div class="modal-content">
+      <img id="modalImage" src="" alt="照片預覽">
+      <label>健康狀態</label>
+      <select id="modalHealth">
+        <option value="">未選擇</option>
+        <option value="正常成團">正常成團</option>
+        <option value="條狀偏軟">條狀偏軟</option>
+        <option value="水便">水便</option>
+        <option value="綠便">綠便</option>
+        <option value="帶血">帶血</option>
+        <option value="其他">其他</option>
+      </select>
+      <label>腳環號</label>
+      <input type="text" id="modalBand" placeholder="#T2024-00123" list="bandList">
+      <datalist id="bandList"></datalist>
+      <label>備註</label>
+      <textarea id="modalNotes" rows="2" placeholder="任何備註..."></textarea>
+      <div class="btn-group">
+        <button class="secondary" id="cancelEditBtn">取消</button>
+        <button id="saveEditBtn">儲存</button>
+      </div>
+      <button id="playAudioBtn" style="margin-top: 8px; background:#34c759;" disabled>▶ 播放語音</button>
+    </div>
+  </div>
+</div>
+
+<!-- 使用 JSZip 用於匯出 ZIP (CDN, 但可離線時載入備用) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+  // ---------- 全域變數與初始化 ----------
+  const DB_NAME = 'PigeonLogDB';
+  const DB_VERSION = 1;
+  let db;
+  let currentStream;
+  let currentPhotoId = null; // 編輯中的照片ID
+  let mediaRecorder;
+  let audioChunks = [];
+  const defaultLoftZone = () => localStorage.getItem('defaultLoftZone') || '未分類';
+  const voiceEnabled = () => localStorage.getItem('voiceEnabled') !== 'false'; // 預設開啟
+
+  // ---------- IndexedDB 操作 ----------
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('photos')) {
+          const store = db.createObjectStore('photos', { keyPath: 'photo_id' });
+          store.createIndex('captured_at', 'captured_at', { unique: false });
+          store.createIndex('band_number', 'band_number', { unique: false });
+        }
+      };
+      request.onsuccess = (event) => { db = event.target.result; resolve(db); };
+      request.onerror = (event) => reject(event.target.error);
+    });
+  }
+
+  function addPhoto(photo) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('photos', 'readwrite');
+      const store = tx.objectStore('photos');
+      store.add(photo);
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  function updatePhoto(photo_id, changes) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('photos', 'readwrite');
+      const store = tx.objectStore('photos');
+      const getReq = store.get(photo_id);
+      getReq.onsuccess = () => {
+        const data = getReq.result;
+        if (!data) return reject('not found');
+        Object.assign(data, changes);
+        store.put(data);
+        tx.oncomplete = () => resolve();
+        tx.onerror = (e) => reject(e.target.error);
+      };
+      getReq.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  function getAllPhotos() {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('photos', 'readonly');
+      const store = tx.objectStore('photos');
+      const index = store.index('captured_at');
+      const request = index.openCursor(null, 'prev'); // 新到舊
+      const results = [];
+      request.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) {
+          results.push(cursor.value);
+          cursor.continue();
+        } else {
+          resolve(results);
+        }
+      };
+      request.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  function getPhotoById(photo_id) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('photos', 'readonly');
+      const store = tx.objectStore('photos');
+      const req = store.get(photo_id);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  function deleteAllPhotos() {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('photos', 'readwrite');
+      const store = tx.objectStore('photos');
+      store.clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  // ---------- 工具函數 ----------
+  function generateUUID() {
+    return 'xxxx-xxxx-4xxx-yxxx-xxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+  function formatDateTime(iso) {
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function showGreenCheck() {
+    const el = document.getElementById('greenCheck');
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 800);
+  }
+
+  // ---------- 相機與拍照 ----------
+  async function startCamera() {
+    try {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      currentStream = stream;
+      document.getElementById('video').srcObject = stream;
+    } catch (err) {
+      alert('無法啟動相機，請確認已授予權限。');
+    }
+  }
+
+  function stopCamera() {
+    if (currentStream) {
+      currentStream.getTracks().forEach(track => track.stop());
+      currentStream = null;
+    }
+  }
+
+  function capturePhoto() {
+    const video = document.getElementById('video');
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.9); // base64
+  }
+
+  async function startVoiceRecording(photoId) {
+    if (!voiceEnabled()) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunks.push(e.data);
+      };
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64Audio = reader.result; // data:audio/webm;base64,...
+          await updatePhoto(photoId, { audio_data: base64Audio });
+        };
+        reader.readAsDataURL(audioBlob);
+        // 釋放麥克風
+        stream.getTracks().forEach(t => t.stop());
+      };
+      mediaRecorder.start();
+      document.getElementById('recIndicator').classList.add('active');
+      setTimeout(() => {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+          mediaRecorder.stop();
+          document.getElementById('recIndicator').classList.remove('active');
+        }
+      }, 3000);
+    } catch (e) {
+      console.warn('無法錄音', e);
+    }
+  }
+
+  // 拍照主流程
+  async function onShutter() {
+    const photoData = capturePhoto();
+    const photoId = generateUUID();
+    const now = new Date().toISOString();
+    const zone = defaultLoftZone();
+
+    const record = {
+      photo_id: photoId,
+      image_data: photoData,      // base64 jpeg
+      captured_at: now,
+      loft_zone: zone,
+      band_number: null,
+      health_status: null,
+      notes: null,
+      audio_data: null
+    };
+
+    await addPhoto(record);
+    showGreenCheck();
+
+    // 啟動3秒錄音 (非同步)
+    startVoiceRecording(photoId);
+  }
+
+  // ---------- 時間軸與UI ----------
+  async function loadTimeline() {
+    const photos = await getAllPhotos();
+    const container = document.getElementById('timelineContent');
+    container.innerHTML = '';
+
+    // 按日期分組
+    const groups = {};
+    photos.forEach(p => {
+      const date = p.captured_at.split('T')[0];
+      if (!groups[date]) groups[date] = [];
+      groups[date].push(p);
+    });
+
+    for (const [date, items] of Object.entries(groups)) {
+      const groupDiv = document.createElement('div');
+      groupDiv.className = 'date-group';
+      groupDiv.innerHTML = `<div class="date-label">${date}</div><div class="photo-grid"></div>`;
+      const grid = groupDiv.querySelector('.photo-grid');
+      items.forEach(p => {
+        const img = document.createElement('img');
+        img.src = p.image_data;
+        img.className = 'photo-thumb';
+        img.onclick = () => openEditModal(p.photo_id);
+        grid.appendChild(img);
+      });
+      container.appendChild(groupDiv);
+    }
+
+    if (photos.length === 0) {
+      container.innerHTML = '<p style="text-align:center; color:#888;">尚無記錄，請拍張照片開始。</p>';
+    }
+  }
+
+  async function openEditModal(photoId) {
+    const photo = await getPhotoById(photoId);
+    if (!photo) return;
+    currentPhotoId = photoId;
+    document.getElementById('modalImage').src = photo.image_data;
+    document.getElementById('modalHealth').value = photo.health_status || '';
+    document.getElementById('modalBand').value = photo.band_number || '';
+    document.getElementById('modalNotes').value = photo.notes || '';
+
+    const playBtn = document.getElementById('playAudioBtn');
+    if (photo.audio_data) {
+      playBtn.disabled = false;
+      playBtn.onclick = () => {
+        const audio = new Audio(photo.audio_data);
+        audio.play();
+      };
+    } else {
+      playBtn.disabled = true;
+    }
+
+    // 更新腳環號建議
+    updateBandSuggestions();
+
+    document.getElementById('editModal').style.display = 'flex';
+  }
+
+  function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+    currentPhotoId = null;
+  }
+
+  async function saveEdit() {
+    if (!currentPhotoId) return;
+    const changes = {
+      health_status: document.getElementById('modalHealth').value || null,
+      band_number: document.getElementById('modalBand').value || null,
+      notes: document.getElementById('modalNotes').value || null
+    };
+    await updatePhoto(currentPhotoId, changes);
+    closeEditModal();
+    loadTimeline(); // 刷新時間軸
+  }
+
+  async function updateBandSuggestions() {
+    const photos = await getAllPhotos();
+    const bands = new Set();
+    photos.forEach(p => { if (p.band_number) bands.add(p.band_number); });
+    const datalist = document.getElementById('bandList');
+    datalist.innerHTML = '';
+    bands.forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b;
+      datalist.appendChild(opt);
+    });
+  }
+
+  // 匯出本月資料 (簡化: 全部匯出為ZIP含CSV)
+  async function exportData() {
+    const photos = await getAllPhotos();
+    if (photos.length === 0) {
+      alert('沒有資料可匯出');
+      return;
+    }
+
+    // 使用JSZip (如果載入失敗則降級為純CSV)
+    if (typeof JSZip === 'undefined') {
+      alert('JSZip 未載入，將僅下載 CSV 檔案。');
+      downloadCSV(photos);
+      return;
+    }
+
+    const zip = new JSZip();
+    const csvRows = [['photo_id', 'captured_at', 'loft_zone', 'band_number', 'health_status', 'notes', 'image_file', 'audio_file']];
+    
+    for (const p of photos) {
+      const imgFileName = `${p.photo_id}.jpg`;
+      const audioFileName = p.audio_data ? `${p.photo_id}.webm` : '';
+      
+      // 加入照片檔案 (base64 -> blob)
+      if (p.image_data) {
+        const imgBlob = dataURItoBlob(p.image_data);
+        zip.file(imgFileName, imgBlob);
+      }
+      if (p.audio_data) {
+        const audioBlob = dataURItoBlob(p.audio_data);
+        zip.file(audioFileName, audioBlob);
+      }
+      
+      csvRows.push([
+        p.photo_id,
+        p.captured_at,
+        p.loft_zone,
+        p.band_number || '',
+        p.health_status || '',
+        p.notes || '',
+        imgFileName,
+        audioFileName
+      ]);
+    }
+
+    const csvContent = csvRows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    zip.file('export.csv', csvContent);
+
+    const content = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(content);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pigeon_log_${new Date().toISOString().slice(0,10)}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function dataURItoBlob(dataURI) {
+    const byteString = atob(dataURI.split(',')[1]);
+    const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([ab], { type: mimeString });
+  }
+
+  function downloadCSV(photos) {
+    const rows = [['photo_id', 'captured_at', 'loft_zone', 'band_number', 'health_status', 'notes']];
+    photos.forEach(p => rows.push([p.photo_id, p.captured_at, p.loft_zone, p.band_number||'', p.health_status||'', p.notes||'']));
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pigeon_log_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  }
+
+  // ---------- 視圖切換 ----------
+  function showView(viewId) {
+    document.getElementById('cameraView').style.display = 'none';
+    document.getElementById('timelineView').style.display = 'none';
+    document.getElementById('settingsView').style.display = 'none';
+    document.getElementById(viewId).style.display = viewId === 'timelineView' ? 'flex' : 'block';
+    if (viewId === 'timelineView') {
+      loadTimeline();
+    }
+  }
+
+  // ---------- 事件綁定 ----------
+  document.getElementById('shutterBtn').addEventListener('click', onShutter);
+  document.getElementById('toTimelineBtn').addEventListener('click', () => {
+    stopCamera();
+    showView('timelineView');
+  });
+  document.getElementById('backToCameraBtn').addEventListener('click', () => {
+    showView('cameraView');
+    startCamera();
+  });
+  document.getElementById('toSettingsBtn').addEventListener('click', () => {
+    stopCamera();
+    showView('settingsView');
+  });
+  document.getElementById('backFromSettingsBtn').addEventListener('click', () => {
+    showView('cameraView');
+    startCamera();
+  });
+  document.getElementById('cancelEditBtn').addEventListener('click', closeEditModal);
+  document.getElementById('saveEditBtn').addEventListener('click', saveEdit);
+  document.getElementById('exportBtn').addEventListener('click', exportData);
+
+  document.getElementById('voiceToggle').addEventListener('change', (e) => {
+    localStorage.setItem('voiceEnabled', e.target.checked);
+  });
+  document.getElementById('loftZoneSelect').addEventListener('change', (e) => {
+    localStorage.setItem('defaultLoftZone', e.target.value);
+  });
+  document.getElementById('clearAllBtn').addEventListener('click', async () => {
+    if (confirm('確定要清除所有照片與記錄嗎？此操作無法復原！')) {
+      await deleteAllPhotos();
+      alert('已清除所有資料');
+      loadTimeline();
+    }
+  });
+
+  // 初始化設定值
+  document.getElementById('voiceToggle').checked = voiceEnabled();
+  document.getElementById('loftZoneSelect').value = defaultLoftZone();
+
+  // 啟動應用
+  (async () => {
+    await openDB();
+    await startCamera();
+    // 預設顯示相機
+    showView('cameraView');
+  })();
+
+  // 頁面關閉時釋放鏡頭
+  window.addEventListener('beforeunload', () => stopCamera());
+</script>
+</body>
+</html>
